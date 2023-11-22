@@ -29,25 +29,41 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import com.github.mikephil.charting.charts.LineChart;
 import com.github.mikephil.charting.data.LineData;
 import com.github.mikephil.charting.data.LineDataSet;
-import com.github.mikephil.charting.interfaces.datasets.ILineDataSet;
-import com.github.mikephil.charting.charts.BarChart;
-import com.github.mikephil.charting.data.BarData;
-import com.github.mikephil.charting.data.BarDataSet;
-import com.github.mikephil.charting.data.BarEntry;
 
-import kotlin.math.MathKt;
+import android.os.Handler;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.widget.ImageView;
+import android.graphics.Paint;
+
+import com.github.mikephil.charting.charts.ScatterChart;
+import com.github.mikephil.charting.data.ScatterData;
+import com.github.mikephil.charting.data.ScatterDataSet;
+
 import java.util.ArrayList;
+
+
+
+
 
 public class MainActivity extends AppCompatActivity {
 
     private static final int PERMISSION_REQUEST_CODE = 1; // ここで定義
 
     private LineChart mChart;
-    private BarChart mSecondChart;
+    private ScatterChart mSecondChart;
 
+    private ImageView heatmapImageView;
+    private Bitmap heatmapBitmap;
+    private Canvas heatmapCanvas;
+
+    private Handler handler;
+    private Runnable heatmapUpdater;
     // 起動時の秒
     private double appStartTime;
-
+    private final int samplingRate = 2756;
+    private double columnStartTime = 0.0;
+    private final double columnDuration = 0.1; // seconds
     private final int[] colors = new int[]{
             BLUE,
             Color.GRAY,
@@ -94,24 +110,26 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void setupSecondChart() {
-        mSecondChart.setData(new BarData());
+        mSecondChart.setData(new ScatterData());
 
-        BarDataSet secondDataSet = new BarDataSet(new ArrayList<BarEntry>(), "Second FFT Result");
-        secondDataSet.setColor(Color.RED);
-        secondDataSet.setDrawValues(false);
-        secondDataSet.setBarBorderWidth(0.5f);
+        ScatterDataSet scatterDataSet = new ScatterDataSet(new ArrayList<>(), "Second Scatter FFT Result");
+        scatterDataSet.setColor(Color.BLUE);
+        scatterDataSet.setScatterShape(ScatterChart.ScatterShape.CIRCLE); // サークルの形状に設定
+        scatterDataSet.setScatterShapeSize(8f); // サークルのサイズを設定
+        scatterDataSet.setDrawValues(false);
 
-        BarData secondBarData = new BarData(secondDataSet);
-        mSecondChart.setData(secondBarData);  // BarData をセット
+        ScatterData scatterData = new ScatterData(scatterDataSet);
+        mSecondChart.setData(scatterData);
 
         mSecondChart.getDescription().setEnabled(false);
         mSecondChart.setDrawGridBackground(true);
         mSecondChart.getAxisRight().setEnabled(false);
 
+
         // 縦軸
         YAxis secondYAxis = mSecondChart.getAxisLeft();
         secondYAxis.setAxisMinimum(0);
-        secondYAxis.setAxisMaximum(700f);
+        secondYAxis.setAxisMaximum(1000f);
 
         // 周波数単位
         secondYAxis.setLabelCount(6);  // ラベルの数
@@ -129,6 +147,23 @@ public class MainActivity extends AppCompatActivity {
         mSecondChart.notifyDataSetChanged();
         mSecondChart.invalidate();
     }
+    /*private void drawAxisLabels() {
+        // ビットマップのサイズを取得
+        int width = heatmapBitmap.getWidth();
+        int height = heatmapBitmap.getHeight();
+
+        // 目盛りの数
+        int numXTicks = 10; // x軸の目盛りの数
+        int numYTicks = 10; // y軸の目盛りの数
+
+        // x軸の目盛りの間隔
+        float xTickInterval = (float) width / numXTicks;
+
+        // y軸の目盛りの間隔
+        float yTickInterval = (float) height / numYTicks;
+
+
+    }*/
 
 
     // X軸単位
@@ -168,24 +203,30 @@ public class MainActivity extends AppCompatActivity {
 
         mChart = findViewById(R.id.chart);
         setupChart();
-        requestAudioPermission();
 
-        mSecondChart = findViewById(R.id.secondChart);  // レイアウトからグラフのViewを取得
+
+
+        mSecondChart = findViewById(R.id.scatterChart);  // レイアウトからグラフのViewを取得
         setupSecondChart();  // 新しいグラフの初期設定
+
+        /*heatmapImageView = findViewById(R.id.heatmapImageView);  // レイアウトからImageViewを取得
+        if (heatmapImageView.getWidth() > 0 && heatmapImageView.getHeight() > 0) {
+            heatmapBitmap = Bitmap.createBitmap(heatmapImageView.getWidth(), heatmapImageView.getHeight(), Bitmap.Config.ARGB_8888);
+            heatmapCanvas = new Canvas(heatmapBitmap);
+        } else {
+            Log.e("BitmapCreationError", "View size is not yet determined. Creating a temporary bitmap.");
+            heatmapBitmap = Bitmap.createBitmap(900, 900, Bitmap.Config.ARGB_8888);
+            heatmapCanvas = new Canvas(heatmapBitmap);
+
+        }
+
+        // ここで heatmapBitmap のサイズもログに出力
+        Log.d("BitmapSize", "heatmapBitmap size: " + heatmapBitmap.getWidth() + " x " + heatmapBitmap.getHeight());*/
 
         AudioRecordSample audioRecordSample = new AudioRecordSample();
         audioRecordSample.startRecording();
 
-        /* ここでデータセットを取得し、新しく作成する
-        LineDataSet dataSet = (LineDataSet) mChart.getData().getDataSetByIndex(0);
-        if (dataSet == null) {
-            setupChart();
-            dataSet = (LineDataSet) mChart.getData().getDataSetByIndex(0);
-        }
-
-        /* FFT 結果をデータセットに追加
-        mChart.notifyDataSetChanged();
-        mChart.invalidate();*/
+        requestAudioPermission();
     }
 
     public class AudioRecordSample {
@@ -305,7 +346,6 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void run() {
                 LineDataSet dataSet = (LineDataSet) mChart.getData().getDataSetByIndex(0);
-                BarDataSet secondDataSet = (BarDataSet) mSecondChart.getData().getDataSetByIndex(0);
 
                 if (dataSet == null) {
                     setupChart();
@@ -314,23 +354,46 @@ public class MainActivity extends AppCompatActivity {
 
                 dataSet.clear(); // 既存のデータをクリア
 
+                ScatterData scatterData = mSecondChart.getData();
+                if (scatterData == null) {
+                    scatterData = new ScatterData();
+                    mSecondChart.setData(scatterData);
+                }
+
+                ScatterChart secondChart = findViewById(R.id.scatterChart);
+                ScatterDataSet secondDataSet = (ScatterDataSet) mSecondChart.getData().getDataSetByIndex(0);
                 if (secondDataSet == null) {
                     setupSecondChart();
-                    secondDataSet = (BarDataSet) mSecondChart.getData().getDataSetByIndex(0);
+                    secondDataSet = (ScatterDataSet) mSecondChart.getData().getDataSetByIndex(0);
 
                     // 初めてデータが追加されるときの処理
                     mSecondChart.getXAxis().setAxisMinimum((float) getElapsedTimeInSeconds());
                     mSecondChart.getXAxis().setAxisMaximum((float) getElapsedTimeInSeconds() + 3);  // 3秒
                 }
 
-                //secondDataSet.clear();  // 既存のデータをクリア
+                //secondDataSet.clear();  // 既存のデータをクリア*/
+
+                // BarChartのデータセットをクリア
+                //mSecondChart.getData().clearValues();
+
+                /* ここでヒートマップデータを生成し、Bitmapに描画
+                drawHeatmap(fftResult);
+
+                // BitmapをImageViewにセット
+                heatmapImageView.setImageBitmap(heatmapBitmap);
+                //Log.d("Debug", "drawHeatmap called");
+
+                /* BarChartを更新
+                mSecondChart.notifyDataSetChanged();
+                mSecondChart.invalidate();*/
 
                 // FFT 結果から周波数成分を取得してデータセットに追加
                 double[] frequencies = calculateFrequencies(fftResult);
 
-                double maxAmplitude = Double.MIN_VALUE;
+                ScatterChart scatterChart = findViewById(R.id.scatterChart);
+                scatterChart.clear(); // 既存のデータをクリア
 
-                int maxAmplitudeIndex = -1;
+                List<Entry> entries = new ArrayList<>();
 
                 for (int i = 0; i < frequencies.length; i++) {
                     double squaredValue = fftResult[i] * fftResult[i];
@@ -342,10 +405,14 @@ public class MainActivity extends AppCompatActivity {
                     double amplitude = fftResult[i];  // 振幅スペクトルを取得
 
                     int color = getColorForAmplitude(amplitude);
-                    secondDataSet.setColor(color);
 
+                    double currentTime = getCurrentTimeInSeconds();  // 現在の時間を取得
+                    double elapsedTime = getElapsedTimeInSeconds();  // 経過時間を取得
 
-                    secondDataSet.addEntry(new BarEntry((float) getElapsedTimeInSeconds(), (float) frequencies[i]));
+                    float x = (float) elapsedTime;  // 横軸に時間
+                    float y = (float) frequencies[i];  // 縦軸に周波数
+
+                    entries.add(new Entry(x, y));
 
                     /* 770Hzと960Hzの周波数が含まれているか確認
                     if (!detected770Hz.get() && Math.abs(frequencies[i] - 770) < tolerance && amplitudeDB > thresholdDB) {
@@ -362,12 +429,18 @@ public class MainActivity extends AppCompatActivity {
                 // 左に移動させるためにX軸の最小値と最大値を更新
                 mSecondChart.getXAxis().setAxisMinimum((float) getElapsedTimeInSeconds() - 3);  // 3秒表示
                 mSecondChart.getXAxis().setAxisMaximum((float) getElapsedTimeInSeconds());
-                //Log.d("Time", "-------------------" );
-                mChart.notifyDataSetChanged();
-                mChart.invalidate();
 
+
+                //Log.d("Time", "-------------------" );*/
+
+
+                secondDataSet.setValues(entries);
                 mSecondChart.notifyDataSetChanged();
                 mSecondChart.invalidate();
+
+
+                mChart.notifyDataSetChanged();
+                mChart.invalidate();
             }
         });
     }
@@ -416,22 +489,77 @@ public class MainActivity extends AppCompatActivity {
     }
 
     // 振幅に応じて色を返すメソッド
-    private int getColorForAmplitude(double amplitude) {
-        // 振幅の閾値を定義
-        double lowAmplitudeThreshold = 50.0;
-        double mediumAmplitudeThreshold = 100.0;
-        double highAmplitudeThreshold = 150.0;
+    // 振幅に応じて色を返すメソッドを変更
+    private int getColorForAmplitude(double amplitudeDB) {
+        double normalizedAmplitude = amplitudeDB;
 
-        if (amplitude < lowAmplitudeThreshold) {
-            return Color.BLUE; // 青系
-        } else if (amplitude < mediumAmplitudeThreshold) {
-            return Color.GREEN; // 黄緑系
-        } else if (amplitude < highAmplitudeThreshold) {
-            return Color.YELLOW; // 黄色系
-        } else {
-            return Color.RED; // 赤系
+        // 振幅が70デシベル以下の場合は色を付けない
+        if (normalizedAmplitude <= 70) {
+            return Color.TRANSPARENT; // 透明色
         }
+
+        // 濃淡をつけるためにRGBを計算
+        int red = (int) (255 * (1 - normalizedAmplitude));
+        int green = (int) (255 * normalizedAmplitude);
+
+        // Color.rgbでRGBを合成して色を作成
+        return Color.rgb(red, green, 0); // 赤が薄くなり、緑が濃くなるように設定
     }
+
+    private int offsetX = 0; // 左にシフトするオフセット
+    // ヒートマップを描画するメソッド
+    private void drawHeatmap(double[] fftResult) {
+        // 周波数成分の間隔
+        double frequencyResolution = (double) samplingRate / (2 * fftResult.length);
+
+        /// Bitmapを右にシフト
+        heatmapCanvas.save(); // Canvasの状態を保存
+        heatmapCanvas.translate(-10, 0);
+
+        // ヒートマップの描画ロジック
+        for (int i = 0; i < fftResult.length; i++) {
+            double frequency = i * frequencyResolution;
+            double squaredValue = fftResult[i] * fftResult[i];
+            double amplitudeDB = 20 * Math.log10(Math.sqrt(squaredValue)); // 2乗した値をデシベルに変換
+
+            int color = getColorForAmplitude(amplitudeDB);
+
+            double currentTime = getCurrentTimeInSeconds();  // 現在の時間を取得
+            double elapsedTime = getElapsedTimeInSeconds();  // 経過時間を取得
+
+            // xとyの値
+            int y = (int) frequency;  // y軸には周波数を使用
+
+
+            double minX = 0;  // 任意の最小値を設定
+            int x = heatmapBitmap.getWidth() - 1; // 一番右に描画
+
+
+            // yの値をコンソールに表示
+            //System.out.println("Y value: " + y);
+
+            // yの値がbitmap.height()を超えないように制約
+            y = Math.min(y, heatmapBitmap.getHeight() - 1);
+            // yの値が0以下にならないように制約
+            y = Math.max(y, 0);
+
+            // 点の大きさを設定
+            int pointSize = 3; // 任意の大きさ
+            // 円を描画
+            Paint paint = new Paint();
+            paint.setColor(color);
+            heatmapCanvas.drawCircle(x, y, pointSize, paint);
+
+
+        }
+
+        // BitmapをImageViewにセット
+        heatmapImageView.setImageBitmap(heatmapBitmap);
+
+    }
+
+
+
 
 
 

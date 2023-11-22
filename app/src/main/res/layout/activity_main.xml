@@ -10,7 +10,9 @@
     <RelativeLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        tools:context=".MainActivity">
+        tools:context=".MainActivity"
+        tools:layout_editor_absoluteX="-176dp"
+        tools:layout_editor_absoluteY="16dp">
 
         <com.github.mikephil.charting.charts.LineChart
             android:id="@+id/chart"
@@ -19,13 +21,19 @@
             android:layout_weight="1" />
 
 
-
-        <com.github.mikephil.charting.charts.BarChart
-            android:id="@+id/secondChart"
+        <!--ImageView
+            android:id="@+id/heatmapImageView"
             android:layout_width="match_parent"
             android:layout_height="350dp"
-            android:layout_weight="1"
-            android:layout_below="@id/chart" />
+            android:layout_below="@id/chart"
+            android:layout_marginTop="4dp"
+            android:scaleType="centerInside" /!-->
+
+        <com.github.mikephil.charting.charts.ScatterChart
+            android:id="@+id/scatterChart"
+            android:layout_width="match_parent"
+            android:layout_height="350dp"
+            android:layout_below="@id/chart"/>
 
 
 
